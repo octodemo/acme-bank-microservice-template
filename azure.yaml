@@ -2,12 +2,26 @@
 name: acme-microservice
 metadata:
   template: acme-bank-microservice-template@0.0.1
-# Demo default: deploy into the existing Acme Bank resource group so this
-# service joins the shared platform (ACR, Container Apps Env, App Insights).
-# Override by setting AZURE_RESOURCE_GROUP in the azd env.
-resourceGroup: rg-acmebank
 infra:
   provider: bicep
+# preprovision hook seeds the azd env with the existing Acme Bank platform
+# defaults so `azd up` runs without prompts. The top-level `resourceGroup:`
+# property in azure.yaml is currently broken (Azure/azure-dev#4287), so we
+# write AZURE_RESOURCE_GROUP via the hook instead.
+hooks:
+  preprovision:
+    posix:
+      shell: sh
+      run: |
+        azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
+        azd env set AZURE_RESOURCE_GROUP rg-acmebank
+        azd env set AZURE_LOCATION eastus2
+    windows:
+      shell: pwsh
+      run: |
+        azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
+        azd env set AZURE_RESOURCE_GROUP rg-acmebank
+        azd env set AZURE_LOCATION eastus2
 services:
   myservice:
     project: ./src/MyService
