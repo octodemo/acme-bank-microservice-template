@@ -1,0 +1,81 @@
+# Triggers after a successful build-image run on main; requires contents: read and id-token: write for azd deployment with Azure OIDC.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [build-image]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+jobs:
+  deploy:
+    name: Deploy with azd
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event.workflow_run.conclusion == 'success'
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    env:
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      SHARED_MANAGED_IDENTITY_ID: ${{ vars.SHARED_MANAGED_IDENTITY_ID }}
+      SHARED_CONTAINER_APPS_ENV_ID: ${{ vars.SHARED_CONTAINER_APPS_ENV_ID }}
+      SHARED_ACR_LOGIN_SERVER: ${{ vars.SHARED_ACR_LOGIN_SERVER }}
+      SHARED_APP_INSIGHTS_CONNECTION_STRING: ${{ secrets.SHARED_APP_INSIGHTS_CONNECTION_STRING }}
+      SHARED_SQL_CONNECTION_STRING: ${{ secrets.SHARED_SQL_CONNECTION_STRING }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Install azd
+        uses: Azure/setup-azd@634ad924cf8baef2257898ba5663be8d19f15aca # v2
+
+      - name: Azure login
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: azd auth login (federated)
+        shell: bash
+        run: |
+          azd auth login             --client-id "$AZURE_CLIENT_ID"             --federated-credential-provider "github"             --tenant-id "$AZURE_TENANT_ID"
+
+      - name: Download image digest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-digest
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Load azd environment
+        shell: bash
+        run: |
+          azd env new "$AZURE_ENV_NAME" --location "$AZURE_LOCATION" --subscription "$AZURE_SUBSCRIPTION_ID" --no-prompt || azd env select "$AZURE_ENV_NAME"
+          azd env set AZURE_LOCATION "$AZURE_LOCATION"
+          azd env set SHARED_MANAGED_IDENTITY_ID "$SHARED_MANAGED_IDENTITY_ID"
+          azd env set SHARED_CONTAINER_APPS_ENV_ID "$SHARED_CONTAINER_APPS_ENV_ID"
+          azd env set SHARED_ACR_LOGIN_SERVER "$SHARED_ACR_LOGIN_SERVER"
+          azd env set SHARED_APP_INSIGHTS_CONNECTION_STRING "$SHARED_APP_INSIGHTS_CONNECTION_STRING"
+          azd env set SHARED_SQL_CONNECTION_STRING "${SHARED_SQL_CONNECTION_STRING:-}"
+          azd env set SERVICE_MYSERVICE_IMAGE_NAME "$(jq -r '.SERVICE_MYSERVICE_IMAGE_NAME' image-digest.json)"
+
+      - name: Provision infrastructure
+        run: azd provision --no-prompt

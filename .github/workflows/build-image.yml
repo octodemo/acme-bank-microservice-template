@@ -1,0 +1,104 @@
+# Triggers on PRs and pushes to main; main pushes require id-token: write, attestations: write, and packages: write for OIDC, provenance, and registry publishing.
+name: build-image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  packages: write
+
+jobs:
+  image:
+    name: Build image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
+    env:
+      ACR_LOGIN_SERVER: ${{ vars.SHARED_ACR_LOGIN_SERVER }}
+      IMAGE_REF: ${{ vars.SHARED_ACR_LOGIN_SERVER }}/myservice:sha-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Azure login (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          acr_name="${ACR_LOGIN_SERVER%%.azurecr.io}"
+          az acr login --name "$acr_name"
+
+      - name: Build image
+        shell: bash
+        run: |
+          image_ref="${IMAGE_REF:-myservice:pr-${{ github.run_id }}}"
+          docker build             -t "$image_ref"             -f src/MyService/Dockerfile             .
+          echo "image_ref=$image_ref" >> "$GITHUB_ENV"
+
+      - name: Generate SPDX SBOM (microsoft/sbom-tool)
+        shell: bash
+        run: |
+          curl -sSL -o sbom-tool https://github.com/microsoft/sbom-tool/releases/latest/download/sbom-tool-linux-x64
+          chmod +x sbom-tool
+          mkdir -p _sbom
+          ./sbom-tool generate             -di "$image_ref"             -b ./_sbom             -bc .             -pn "myservice"             -pv "sha-${{ github.sha }}"             -ps "Acme Bank"             -nsb "https://acmebank.example/myservice"
+          ls -la _sbom/_manifest/spdx_2.2/
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-myservice
+          path: _sbom/_manifest/spdx_2.2/
+
+      - name: Push image (main only)
+        id: push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          docker push "$image_ref"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" | cut -d@ -f2)
+          if [[ -z "$digest" ]]; then
+            echo "::error::Failed to capture pushed digest for $image_ref" && exit 1
+          fi
+          full_ref="${ACR_LOGIN_SERVER}/myservice@${digest}"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "full_ref=$full_ref" >> "$GITHUB_OUTPUT"
+          jq -n --arg imageName "$full_ref" '{SERVICE_MYSERVICE_IMAGE_NAME: $imageName}' > image-digest.json
+          echo "Pushed $full_ref"
+
+      - name: Attest build provenance (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ env.ACR_LOGIN_SERVER }}/myservice
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Upload image digest (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-digest
+          path: image-digest.json

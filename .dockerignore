@@ -1,0 +1,15 @@
+.git
+.gitignore
+.azure
+.vs
+.vscode
+.idea
+**/bin
+**/obj
+TestResults
+coverage-report
+node_modules
+.env
+.env.*
+*.pfx
+*.key

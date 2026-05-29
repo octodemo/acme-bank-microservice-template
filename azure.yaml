@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://aka.ms/azure-dev/azure.yaml.json
+name: acme-microservice
+metadata:
+  template: acme-bank-microservice-template@0.0.1
+infra:
+  provider: bicep
+services:
+  myservice:
+    project: ./src/MyService
+    language: dotnet
+    host: containerapp
+    docker:
+      path: ./src/MyService/Dockerfile
+      context: .
