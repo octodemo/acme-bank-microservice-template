@@ -2,6 +2,10 @@
 name: acme-microservice
 metadata:
   template: acme-bank-microservice-template@0.0.1
+# Demo default: deploy into the existing Acme Bank resource group so this
+# service joins the shared platform (ACR, Container Apps Env, App Insights).
+# Override by setting AZURE_RESOURCE_GROUP in the azd env.
+resourceGroup: rg-acmebank
 infra:
   provider: bicep
 services:

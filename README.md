@@ -5,39 +5,30 @@ This repository is an `azd`-compatible paved-road template for adding a single .
 ## Use the template
 
 ```bash
-azd init -t octodemo/acme-bank-microservice-template
-```
-
-After initialization, rename the placeholder service from `MyService` to your real service name, run `azd pipeline config`, and push the repository to GitHub. The template deliberately uses the literal placeholder `MyService` in code and `myservice` in deployment configuration so developers and Copilot can perform an explicit, reviewable rename after init.
-
-## Joining the existing Acme Bank environment
-
-The template joins an existing Acme Bank Azure environment. It does not create Azure Container Registry, Container Apps Environment, or Application Insights — it looks them up by name using Bicep `existing` resources. The Container Apps Environment and Application Insights names are derived from `AZURE_ENV_NAME` and the resource group ID, matching the convention used by [`octodemo/acme-bank`](https://github.com/octodemo/acme-bank).
-
-The new service does create its own user-assigned managed identity (`id-${AZURE_ENV_NAME}-${SERVICE_NAME}`) and grants it `AcrPull` on the shared registry, mirroring the per-service identity pattern used by acme-bank.
-
-### One-time bootstrap
-
-Set the azd environment to point at the existing Acme Bank resource group, then import the two values that aren't derivable from convention (the ACR name and the BFF base URL) from acme-bank's azd environment:
-
-```bash
-azd env new <existing-acme-env-name>
-azd env get-values --cwd ../acme-bank | grep ^ACME_ >> .azure/<existing-acme-env-name>/.env
-```
-
-That populates `ACME_CONTAINER_REGISTRY_NAME` (and `ACME_BFF_BASE_URL` for the frontend template). Everything else — `AZURE_LOCATION`, `AZURE_ENV_NAME`, `SERVICE_<NAME>_IMAGE_NAME` — is set automatically by azd.
-
-Then deploy:
-
-```bash
+mkdir <your-service> && cd <your-service>
+azd init -t octodemo/acme-bank-microservice-template . -e dev
 azd up
 ```
 
-`azd up` packages the image, sets `SERVICE_MYSERVICE_IMAGE_NAME`, runs `azd provision` against `infra/main.bicep`, and deploys the new Container App into the shared environment.
+That's it. `azd up` packages the image, provisions infra into the existing Acme Bank resource group, and deploys the new Container App. azd will prompt for an Azure subscription on first run.
 
-### Optional SQL
+After deployment, rename the placeholder service from `MyService` to your real service name, run `azd pipeline config`, and push to GitHub. The template deliberately uses the literal placeholder `MyService` in code and `myservice` in deployment configuration so developers and Copilot can perform an explicit, reviewable rename after init.
 
-To wire the service to the platform's SQL Server, set `ACME_SQL_CONNECTION_STRING` on the new service's azd env. Leaving it empty keeps the EF Core in-memory fallback used for local dev and demos.
+## How it joins the existing Acme Bank environment
+
+The template does not create Azure Container Registry, Container Apps Environment, or Application Insights — it looks them up by name using Bicep `existing` resources. Container Apps Environment and Application Insights names are derived from `AZURE_ENV_NAME` and the resource group ID, matching the convention used by [`octodemo/acme-bank`](https://github.com/octodemo/acme-bank). The shared ACR name is hardcoded as a default in `infra/main.bicep`.
+
+The new service creates its own user-assigned managed identity (`id-${AZURE_ENV_NAME}-${SERVICE_NAME}`) and grants it `AcrPull` on the shared registry, mirroring the per-service identity pattern used by acme-bank.
+
+The target resource group is set in [`azure.yaml`](./azure.yaml) (`resourceGroup: rg-acmebank`).
+
+### Reusing this template against a different platform
+
+Override the demo defaults to point at a different shared environment:
+
+- `azure.yaml` → change `resourceGroup` to your platform's resource group.
+- `infra/main.bicep` → change the `containerRegistryName` parameter default.
+- Make sure the platform uses the same naming convention for ACA Env and App Insights, or update the `existing` lookups in `infra/main.bicep`.
 
 ## Rename guide
 

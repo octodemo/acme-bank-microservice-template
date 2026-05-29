@@ -14,8 +14,8 @@ param serviceName string = 'myservice'
 @description('Full container image reference including tag or digest. Set automatically by azd as SERVICE_<NAME>_IMAGE_NAME.')
 param imageName string
 
-@description('Name of the shared Azure Container Registry created by the Acme Bank platform bootstrap. Required because ACR naming is not derived from the environment name.')
-param containerRegistryName string
+@description('Name of the shared Azure Container Registry created by the Acme Bank platform bootstrap. Defaulted to the demo registry; override when reusing the template against a different platform.')
+param containerRegistryName string = 'acmebanke40394e9'
 
 @description('Optional SQL connection string. Leave empty to use the EF Core in-memory fallback.')
 @secure()

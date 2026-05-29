@@ -15,7 +15,7 @@
       "value": "${SERVICE_MYSERVICE_IMAGE_NAME}"
     },
     "containerRegistryName": {
-      "value": "${ACME_CONTAINER_REGISTRY_NAME}"
+      "value": "${ACME_CONTAINER_REGISTRY_NAME=acmebanke40394e9}"
     },
     "sqlConnectionString": {
       "value": "${ACME_SQL_CONNECTION_STRING=}"
