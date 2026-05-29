@@ -12,7 +12,7 @@
       "value": "${SERVICE_NAME=myservice}"
     },
     "imageName": {
-      "value": "${SERVICE_MYSERVICE_IMAGE_NAME}"
+      "value": "${SERVICE_MYSERVICE_IMAGE_NAME=mcr.microsoft.com/k8se/quickstart:latest}"
     },
     "containerRegistryName": {
       "value": "${ACME_CONTAINER_REGISTRY_NAME=acmebanke40394e9}"

@@ -11,8 +11,8 @@ param environmentName string
 @maxLength(32)
 param serviceName string = 'myservice'
 
-@description('Full container image reference including tag or digest. Set automatically by azd as SERVICE_<NAME>_IMAGE_NAME.')
-param imageName string
+@description('Full container image reference including tag or digest. Set automatically by azd during the package phase as SERVICE_<NAME>_IMAGE_NAME. The default placeholder lets the first `azd up` provision succeed before the real image is built.')
+param imageName string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Name of the shared Azure Container Registry created by the Acme Bank platform bootstrap. Defaulted to the demo registry; override when reusing the template against a different platform.')
 param containerRegistryName string = 'acmebanke40394e9'
