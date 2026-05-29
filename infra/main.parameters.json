@@ -9,25 +9,16 @@
       "value": "${AZURE_ENV_NAME}"
     },
     "serviceName": {
-      "value": "myservice"
+      "value": "${SERVICE_NAME=myservice}"
     },
     "imageName": {
       "value": "${SERVICE_MYSERVICE_IMAGE_NAME}"
     },
-    "managedIdentityResourceId": {
-      "value": "${SHARED_MANAGED_IDENTITY_ID}"
-    },
-    "containerAppsEnvironmentResourceId": {
-      "value": "${SHARED_CONTAINER_APPS_ENV_ID}"
-    },
-    "containerRegistryLoginServer": {
-      "value": "${SHARED_ACR_LOGIN_SERVER}"
-    },
-    "applicationInsightsConnectionString": {
-      "value": "${SHARED_APP_INSIGHTS_CONNECTION_STRING}"
+    "containerRegistryName": {
+      "value": "${ACME_CONTAINER_REGISTRY_NAME}"
     },
     "sqlConnectionString": {
-      "value": "${SHARED_SQL_CONNECTION_STRING=}"
+      "value": "${ACME_SQL_CONNECTION_STRING=}"
     }
   }
 }

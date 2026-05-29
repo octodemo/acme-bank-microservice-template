@@ -1,49 +1,80 @@
-@description('Azure region for the Container App resource.')
+@description('Azure region for the Container App resource. Defaults to the resource group location.')
 param location string = resourceGroup().location
 
-@description('Azure Developer CLI environment name used in resource naming.')
+@description('Acme Bank azd environment name. Must match the existing environment you are joining (for example, dev).')
 @minLength(1)
 @maxLength(32)
 param environmentName string
 
-@description('Logical service name used for the Container App name and container name.')
+@description('Logical service name. Used for the Container App name, managed identity name, and image name. Rename from myservice when adopting the template.')
 @minLength(1)
 @maxLength(32)
 param serviceName string = 'myservice'
 
-@description('Full container image reference including tag or digest.')
+@description('Full container image reference including tag or digest. Set automatically by azd as SERVICE_<NAME>_IMAGE_NAME.')
 param imageName string
 
-@description('Resource ID of the existing user-assigned managed identity used by the shared Acme Bank environment.')
-param managedIdentityResourceId string
+@description('Name of the shared Azure Container Registry created by the Acme Bank platform bootstrap. Required because ACR naming is not derived from the environment name.')
+param containerRegistryName string
 
-@description('Resource ID of the existing Azure Container Apps managed environment.')
-param containerAppsEnvironmentResourceId string
-
-@description('Login server of the existing Azure Container Registry, for example myregistry.azurecr.io.')
-param containerRegistryLoginServer string
-
-@description('Application Insights connection string for the shared Acme Bank environment.')
-@secure()
-param applicationInsightsConnectionString string
-
-@description('Optional SQL connection string. Leave empty to use the service in-memory fallback.')
+@description('Optional SQL connection string. Leave empty to use the EF Core in-memory fallback.')
 @secure()
 param sqlConnectionString string = ''
 
-var containerApp = 'ca-${environmentName}-${serviceName}'
+// Shared-resource names follow the same convention used by the Acme Bank
+// platform repo so this template can locate them with `existing` lookups.
+var namePrefix = take(replace(toLower(environmentName), '-', ''), 12)
+var suffix = uniqueString(resourceGroup().id, environmentName)
+var containerAppsEnvironmentName = 'cae-${namePrefix}-${suffix}'
+var appInsightsName = 'appi-${namePrefix}-${suffix}'
+var containerAppName = 'ca-${environmentName}-${serviceName}'
+var managedIdentityName = 'id-${environmentName}-${serviceName}'
+
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+  name: containerAppsEnvironmentName
+}
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+}
+
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: containerRegistryName
+}
+
+resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: managedIdentityName
+  location: location
+}
+
+var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+
+resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerRegistry.id, managedIdentity.id, 'acr-pull')
+  scope: containerRegistry
+  properties: {
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: acrPullRoleDefinitionId
+  }
+}
+
 var hasSqlConnection = !empty(sqlConnectionString)
-var secretDefinitions = concat([
+
+var baseSecrets = [
   {
     name: 'applicationinsights-connection-string'
-    value: applicationInsightsConnectionString
+    value: appInsights.properties.ConnectionString
   }
-], hasSqlConnection ? [
+]
+
+var sqlSecrets = hasSqlConnection ? [
   {
     name: 'sql-connection-string'
     value: sqlConnectionString
   }
-] : [])
+] : []
+
 var environmentVariables = concat([
   {
     name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -57,28 +88,25 @@ var environmentVariables = concat([
 ] : [])
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
-  name: containerApp
+  name: containerAppName
   location: location
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${managedIdentityResourceId}': {}
+      '${managedIdentity.id}': {}
     }
   }
   properties: {
-    managedEnvironmentId: containerAppsEnvironmentResourceId
+    managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: 'Single'
       registries: [
         {
-          server: containerRegistryLoginServer
-          identity: managedIdentityResourceId
+          server: containerRegistry.properties.loginServer
+          identity: managedIdentity.id
         }
       ]
-      secrets: [for secret in secretDefinitions: {
-        name: secret.name
-        value: secret.value
-      }]
+      secrets: concat(baseSecrets, sqlSecrets)
       ingress: {
         external: false
         targetPort: 8080
@@ -107,6 +135,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
+  dependsOn: [
+    acrPullAssignment
+  ]
 }
 
 output fqdn string = app.properties.configuration.ingress.fqdn
+output serviceUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
