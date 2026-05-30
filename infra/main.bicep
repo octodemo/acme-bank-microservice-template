@@ -90,6 +90,9 @@ var environmentVariables = concat([
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
+  tags: {
+    'azd-service-name': 'myservice'
+  }
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

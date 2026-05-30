@@ -16,12 +16,14 @@ hooks:
         azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
         azd env set AZURE_RESOURCE_GROUP rg-acmebank
         azd env set AZURE_LOCATION westus3
+        azd env set SERVICE_NAME "$(basename "$PWD")"
     windows:
       shell: pwsh
       run: |
         azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
         azd env set AZURE_RESOURCE_GROUP rg-acmebank
         azd env set AZURE_LOCATION westus3
+        azd env set SERVICE_NAME (Split-Path -Leaf (Get-Location))
 services:
   myservice:
     project: ./src/MyService
