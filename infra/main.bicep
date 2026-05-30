@@ -50,7 +50,7 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
 var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 
 resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerRegistry.id, managedIdentity.properties.principalId, 'acr-pull')
+  name: guid(containerRegistry.id, managedIdentity.id, 'acr-pull')
   scope: containerRegistry
   properties: {
     principalId: managedIdentity.properties.principalId
