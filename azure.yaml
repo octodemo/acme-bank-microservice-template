@@ -4,12 +4,12 @@ metadata:
   template: acme-bank-microservice-template@0.0.1
 infra:
   provider: bicep
-# preprovision hook seeds the azd env with the existing Acme Bank platform
+# preup hook seeds the azd env with the existing Acme Bank platform
 # defaults so `azd up` runs without prompts. The top-level `resourceGroup:`
-# property in azure.yaml is currently broken (Azure/azure-dev#4287), so we
-# write AZURE_RESOURCE_GROUP via the hook instead.
+# property in azure.yaml is currently broken (Azure/azure-dev#4287); preup runs
+# before any prompts so AZURE_RESOURCE_GROUP is seeded in time.
 hooks:
-  preprovision:
+  preup:
     posix:
       shell: sh
       run: |
