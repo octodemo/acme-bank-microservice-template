@@ -13,14 +13,14 @@ hooks:
     posix:
       shell: sh
       run: |
-        azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
+        azd env set AZURE_SUBSCRIPTION_ID f5f55b09-c75c-4bc0-8097-4b2378d7fcde
         azd env set AZURE_RESOURCE_GROUP rg-acmebank
         azd env set AZURE_LOCATION westus3
         azd env set SERVICE_NAME "$(basename "$PWD")"
     windows:
       shell: pwsh
       run: |
-        azd env set AZURE_SUBSCRIPTION_ID e40394e9-2420-443c-97fe-d147dc5dec3a
+        azd env set AZURE_SUBSCRIPTION_ID f5f55b09-c75c-4bc0-8097-4b2378d7fcde
         azd env set AZURE_RESOURCE_GROUP rg-acmebank
         azd env set AZURE_LOCATION westus3
         azd env set SERVICE_NAME (Split-Path -Leaf (Get-Location))
