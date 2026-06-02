@@ -15,7 +15,7 @@ param serviceName string = 'myservice'
 param imageName string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Name of the shared Azure Container Registry created by the Acme Bank platform bootstrap. Defaulted to the demo registry; override when reusing the template against a different platform.')
-param containerRegistryName string = 'acmebanke40394e9'
+param containerRegistryName string = 'acmebankf5f55b09'
 
 @description('Optional SQL connection string. Leave empty to use the EF Core in-memory fallback.')
 @secure()
